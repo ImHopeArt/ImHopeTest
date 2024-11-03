@@ -1,0 +1,21 @@
+CREATE TABLE client_event_data (
+    id                    NUMBER,            -- Идентификатор документа из исходной таблицы
+    subject_code          VARCHAR2(100),     -- Код субъекта
+    subject_name          VARCHAR2(200),     -- Имя или название клиента (в зависимости от типа)
+    subject_type          VARCHAR2(10),      -- Тип субъекта (FL или UL)
+    passport_series       VARCHAR2(10),      -- Серия паспорта (для физического лица)
+    passport_number       VARCHAR2(20),      -- Номер паспорта (для физического лица)
+    issued_by             VARCHAR2(200),     -- Кем выдан паспорт (для физического лица)
+    issued_date           DATE,              -- Дата выдачи паспорта (для физического лица)
+    birth_date            DATE,              -- Дата рождения (для физического лица)
+    birth_place           VARCHAR2(200),     -- Место рождения (для физического лица)
+    address               VARCHAR2(500),     -- Адрес (общий для всех типов)
+    phone                 VARCHAR2(20),      -- Телефон (общий для всех типов)
+    inn                   VARCHAR2(20),      -- ИНН (общий для всех типов)
+    reg_number            VARCHAR2(20),      -- Регистрационный номер
+    snils                 VARCHAR2(20),      -- СНИЛС (для физического лица)
+    previous_name         VARCHAR2(200),     -- Предыдущее название (для юр. лица)
+    reorg_date            DATE,              -- Дата реорганизации (для юр. лица)
+    event_date            DATE,              -- Дата события
+    event_desc            VARCHAR2(500)      -- Описание события
+);
