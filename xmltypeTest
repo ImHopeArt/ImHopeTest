@@ -1,0 +1,135 @@
+CREATE OR REPLACE PROCEDURE parse_blob_xml_to_client_event_data IS
+    -- Переменные для работы с BLOB и CLOB
+    v_blob_data    BLOB;
+    v_clob_data    CLOB;
+    v_xml_data     XMLTYPE;
+    v_dest_offset  NUMBER := 1;
+    v_src_offset   NUMBER := 1;
+    v_blob_len     NUMBER;
+
+BEGIN
+    -- Цикл для обработки всех записей из исходной таблицы
+    FOR rec IN (SELECT id, xml_blob FROM source_table) LOOP
+        -- Конвертация BLOB в CLOB
+        v_blob_data := rec.xml_blob;
+        DBMS_LOB.CREATETEMPORARY(v_clob_data, TRUE);
+        v_blob_len := DBMS_LOB.GETLENGTH(v_blob_data);
+        DBMS_LOB.CONVERTTOCLOB(v_clob_data, v_blob_data, v_blob_len, v_dest_offset, v_src_offset);
+
+        -- Преобразование CLOB в XMLTYPE для работы с XML
+        v_xml_data := XMLTYPE(v_clob_data);
+
+        -- Парсинг данных для физического лица (Subject_FL)
+        FOR client_event IN (
+            SELECT 
+                t.subjectCode AS subject_code,
+                t.fullName AS subject_name,
+                t.passportSeries,
+                t.passportNumber,
+                t.issuedBy,
+                t.issuedDate,
+                t.birthDate,
+                t.birthPlace,
+                t.address,
+                t.phone,
+                t.inn,
+                t.regNumber,
+                t.snils,
+                x.event_date,
+                x.description,
+                'FL' AS subject_type
+            FROM XMLTABLE(
+                '/Document/Data/Subject_FL' 
+                PASSING v_xml_data
+                COLUMNS 
+                    subjectCode    VARCHAR2(100) PATH '@subjectCode',
+                    fullName       VARCHAR2(200) PATH 'Title/FL_1_4_Group/FullName',
+                    passportSeries VARCHAR2(10)  PATH 'Title/FL_1_4_Group/PassportSeries',
+                    passportNumber VARCHAR2(20)  PATH 'Title/FL_1_4_Group/PassportNumber',
+                    issuedBy       VARCHAR2(200) PATH 'Title/FL_1_4_Group/IssuedBy',
+                    issuedDate     DATE          PATH 'Title/FL_1_4_Group/IssuedDate',
+                    birthDate      DATE          PATH 'Title/FL_3_Birth/BirthDate',
+                    birthPlace     VARCHAR2(200) PATH 'Title/FL_3_Birth/BirthPlace',
+                    address        VARCHAR2(500) PATH 'Title/FL_2_5_Group/Address',
+                    phone          VARCHAR2(20)  PATH 'Title/FL_2_5_Group/Phone',
+                    inn            VARCHAR2(20)  PATH 'Title/FL_6_Tax/INN',
+                    regNumber      VARCHAR2(20)  PATH 'Title/FL_6_Tax/RegNumber',
+                    snils          VARCHAR2(20)  PATH 'Title/FL_7_Social/SNILS',
+                    events         XMLTYPE       PATH 'Events'
+            ) t,
+            XMLTABLE(
+                '*'
+                PASSING t.events
+                COLUMNS
+                    event_date   DATE          PATH 'EventDate',
+                    description  VARCHAR2(500) PATH 'Description'
+            ) x
+        ) LOOP
+            -- Вставка данных клиента и события в таблицу
+            INSERT INTO client_event_data (id, subject_code, subject_name, subject_type, passport_series, passport_number, 
+                                           issued_by, issued_date, birth_date, birth_place, address, phone, inn, reg_number, 
+                                           snils, event_date, event_desc)
+            VALUES (rec.id, client_event.subject_code, client_event.subject_name, client_event.subject_type, client_event.passportSeries,
+                    client_event.passportNumber, client_event.issuedBy, client_event.issuedDate, client_event.birthDate, client_event.birthPlace, 
+                    client_event.address, client_event.phone, client_event.inn, client_event.regNumber, client_event.snils, 
+                    client_event.event_date, client_event.description);
+        END LOOP;
+
+        -- Парсинг данных для юридического лица (Subject_UL)
+        FOR client_event IN (
+            SELECT 
+                t.subjectCode AS subject_code,
+                t.orgName AS subject_name,
+                t.address,
+                t.phone,
+                t.inn,
+                t.regNumber,
+                t.previousName,
+                t.reorgDate,
+                x.event_date,
+                x.description,
+                'UL' AS subject_type
+            FROM XMLTABLE(
+                '/Document/Data/Subject_UL' 
+                PASSING v_xml_data
+                COLUMNS 
+                    subjectCode   VARCHAR2(100) PATH '@subjectCode',
+                    orgName       VARCHAR2(200) PATH 'Title/UL_1_Name/OrgName',
+                    address       VARCHAR2(500) PATH 'Title/UL_2_Address/Address',
+                    phone         VARCHAR2(20)  PATH 'Title/UL_2_Address/ContactPhone',
+                    inn           VARCHAR2(20)  PATH 'Title/UL_4_Tax/INN',
+                    regNumber     VARCHAR2(20)  PATH 'Title/UL_3_Reg/RegNumber',
+                    previousName  VARCHAR2(200) PATH 'Title/UL_5_Reorg/PreviousName',
+                    reorgDate     DATE          PATH 'Title/UL_5_Reorg/ReorgDate',
+                    events        XMLTYPE       PATH 'Events'
+            ) t,
+            XMLTABLE(
+                '*'
+                PASSING t.events
+                COLUMNS
+                    event_date   DATE          PATH 'EventDate',
+                    description  VARCHAR2(500) PATH 'Description'
+            ) x
+        ) LOOP
+            -- Вставка данных клиента и события в таблицу
+            INSERT INTO client_event_data (id, subject_code, subject_name, subject_type, address, phone, inn, reg_number, 
+                                           previous_name, reorg_date, event_date, event_desc)
+            VALUES (rec.id, client_event.subject_code, client_event.subject_name, client_event.subject_type, client_event.address, 
+                    client_event.phone, client_event.inn, client_event.regNumber, client_event.previousName, client_event.reorgDate, 
+                    client_event.event_date, client_event.description);
+        END LOOP;
+
+        -- Освобождение временного CLOB
+        DBMS_LOB.FREETEMPORARY(v_clob_data);
+    END LOOP;
+
+    COMMIT;  -- Фиксация транзакции
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Обработка ошибок
+        IF DBMS_LOB.ISOPEN(v_clob_data) THEN
+            DBMS_LOB.FREETEMPORARY(v_clob_data);
+        END IF;
+        RAISE;
+END parse_blob_xml_to_client_event_data;
+/
