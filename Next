@@ -1,0 +1,64 @@
+CREATE OR REPLACE PROCEDURE process_xml_blob IS
+    v_blob          BLOB;
+    v_clob          CLOB;
+    v_xml           XMLTYPE;
+    v_dest_offset   INTEGER := 1;
+    v_src_offset    INTEGER := 1;
+    v_lang_ctx      INTEGER := DBMS_LOB.DEFAULT_LANG_CTX;
+    v_warning       INTEGER;
+    v_client_name   VARCHAR2(100);
+BEGIN
+    -- Извлечение BLOB из исходной таблицы
+    SELECT xml_blob INTO v_blob FROM source_table WHERE id = 1; -- Замените 1 на нужный идентификатор
+
+    -- Проверка на NULL
+    IF v_blob IS NULL THEN
+        DBMS_OUTPUT.PUT_LINE('BLOB is NULL');
+        RETURN;
+    END IF;
+
+    -- Создание временного CLOB
+    DBMS_LOB.CREATETEMPORARY(v_clob, TRUE);
+
+    -- Конвертация BLOB в CLOB с кодировкой UTF-8
+    DBMS_LOB.CONVERTTOCLOB(
+        dest_lob     => v_clob,
+        src_blob     => v_blob,
+        amount       => DBMS_LOB.LOBMAXSIZE,
+        dest_offset  => v_dest_offset,
+        src_offset   => v_src_offset,
+        blob_csid    => NLS_CHARSET_ID('AL32UTF8'),
+        lang_context => v_lang_ctx,
+        warning      => v_warning
+    );
+
+    -- Преобразование CLOB в XMLTYPE
+    v_xml := XMLTYPE(v_clob);
+
+    -- Извлечение имени клиента
+    SELECT EXTRACTVALUE(v_xml, '/doc/fl/title/name') INTO v_client_name FROM dual;
+
+    -- Обработка событий
+    FOR event_rec IN (
+        SELECT
+            EXTRACTVALUE(VALUE(e), 'event_1/num') AS event_num,
+            EXTRACTVALUE(VALUE(e), 'event_1/sum') AS event_sum
+        FROM TABLE(XMLSEQUENCE(EXTRACT(v_xml, '/doc/fl/events/event_1'))) e
+        UNION ALL
+        SELECT
+            EXTRACTVALUE(VALUE(e), 'event_2/num') AS event_num,
+            EXTRACTVALUE(VALUE(e), 'event_2/sum') AS event_sum
+        FROM TABLE(XMLSEQUENCE(EXTRACT(v_xml, '/doc/fl/events/event_2'))) e
+    ) LOOP
+        -- Вставка данных в целевую таблицу
+        INSERT INTO target_table (id, client_name, event_num, event_sum)
+        VALUES (target_table_seq.NEXTVAL, v_client_name, event_rec.event_num, event_rec.event_sum);
+    END LOOP;
+
+    -- Коммит транзакции
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Ошибка: ' || SQLERRM);
+        ROLLBACK;
+END;
