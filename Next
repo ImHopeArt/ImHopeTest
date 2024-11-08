@@ -6,7 +6,6 @@ CREATE OR REPLACE PROCEDURE process_xml_blob IS
     v_src_offset    INTEGER := 1;
     v_lang_ctx      INTEGER := DBMS_LOB.DEFAULT_LANG_CTX;
     v_warning       INTEGER;
-    v_client_name   VARCHAR2(100);
 BEGIN
     -- Извлечение BLOB из исходной таблицы
     SELECT xml_blob INTO v_blob FROM source_table WHERE id = 1; -- Замените 1 на нужный идентификатор
@@ -35,24 +34,24 @@ BEGIN
     -- Преобразование CLOB в XMLTYPE
     v_xml := XMLTYPE(v_clob);
 
-    -- Извлечение имени клиента
-    SELECT EXTRACTVALUE(v_xml, '/doc/fl/title/name') INTO v_client_name FROM dual;
-
-    -- Обработка событий
-    FOR event_rec IN (
+    -- Обработка каждого клиента
+    FOR client IN (
         SELECT
-            EXTRACTVALUE(VALUE(e), 'event_1/num') AS event_num,
-            EXTRACTVALUE(VALUE(e), 'event_1/sum') AS event_sum
-        FROM TABLE(XMLSEQUENCE(EXTRACT(v_xml, '/doc/fl/events/event_1'))) e
-        UNION ALL
-        SELECT
-            EXTRACTVALUE(VALUE(e), 'event_2/num') AS event_num,
-            EXTRACTVALUE(VALUE(e), 'event_2/sum') AS event_sum
-        FROM TABLE(XMLSEQUENCE(EXTRACT(v_xml, '/doc/fl/events/event_2'))) e
+            EXTRACTVALUE(VALUE(c), 'fl/title/name') AS client_name,
+            VALUE(c) AS client_xml
+        FROM TABLE(XMLSEQUENCE(EXTRACT(v_xml, '/doc/fl'))) c
     ) LOOP
-        -- Вставка данных в целевую таблицу
-        INSERT INTO target_table (id, client_name, event_num, event_sum)
-        VALUES (target_table_seq.NEXTVAL, v_client_name, event_rec.event_num, event_rec.event_sum);
+        -- Обработка событий для текущего клиента
+        FOR event IN (
+            SELECT
+                EXTRACTVALUE(VALUE(e), 'num') AS event_num,
+                EXTRACTVALUE(VALUE(e), 'sum') AS event_sum
+            FROM TABLE(XMLSEQUENCE(EXTRACT(client.client_xml, 'events/*'))) e
+        ) LOOP
+            -- Вставка данных в целевую таблицу
+            INSERT INTO target_table (id, client_name, event_num, event_sum)
+            VALUES (target_table_seq.NEXTVAL, client.client_name, event.event_num, event.event_sum);
+        END LOOP;
     END LOOP;
 
     -- Коммит транзакции
