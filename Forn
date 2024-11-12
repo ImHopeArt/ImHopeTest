@@ -1,0 +1,34 @@
+CREATE OR REPLACE PROCEDURE parse_xml_file(p_xml IN XMLTYPE) IS
+    -- Переменные для хранения значений тега и его имени
+    v_tag_name  VARCHAR2(50);
+    v_tag_value VARCHAR2(4000);
+
+BEGIN
+    -- Очистка таблицы перед записью новых данных
+    DELETE FROM events_data;
+
+    -- Цикл по возможным значениям n и y
+    FOR n IN 1..5 LOOP
+        FOR y IN 1..5 LOOP
+            -- Формирование имени тега
+            v_tag_name := 'events_' || n || '_' || y;
+
+            -- Извлечение значения тега из XML-файла
+            BEGIN
+                v_tag_value := p_xml.extract('//*/' || v_tag_name || '/text()').getStringVal();
+            EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                    v_tag_value := NULL; -- если данных нет, то оставляем NULL
+            END;
+
+            -- Если значение найдено, вставляем его в таблицу
+            IF v_tag_value IS NOT NULL THEN
+                INSERT INTO events_data (tag_name, tag_value)
+                VALUES (v_tag_name, v_tag_value);
+            END IF;
+        END LOOP;
+    END LOOP;
+
+    -- Сохранение изменений
+    COMMIT;
+END parse_xml_file;
