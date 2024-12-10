@@ -1,0 +1,62 @@
+CREATE OR REPLACE PROCEDURE extract_event_data IS
+    v_blob          BLOB;
+    v_clob          CLOB;
+    v_xml           XMLTYPE;
+    v_dest_offset   INTEGER := 1;
+    v_src_offset    INTEGER := 1;
+    v_lang_ctx      INTEGER := DBMS_LOB.DEFAULT_LANG_CTX;
+    v_warning       INTEGER;
+BEGIN
+    -- Извлечение BLOB из исходной таблицы
+    SELECT xml_blob INTO v_blob FROM source_table WHERE id = 1; -- Замените 1 на нужный идентификатор
+
+    -- Проверка на NULL
+    IF v_blob IS NULL THEN
+        DBMS_OUTPUT.PUT_LINE('BLOB is NULL');
+        RETURN;
+    END IF;
+
+    -- Создание временного CLOB
+    DBMS_LOB.CREATETEMPORARY(v_clob, TRUE);
+
+    -- Конвертация BLOB в CLOB с кодировкой UTF-8
+    DBMS_LOB.CONVERTTOCLOB(
+        dest_lob     => v_clob,
+        src_blob     => v_blob,
+        amount       => DBMS_LOB.LOBMAXSIZE,
+        dest_offset  => v_dest_offset,
+        src_offset   => v_src_offset,
+        blob_csid    => NLS_CHARSET_ID('AL32UTF8'),
+        lang_context => v_lang_ctx,
+        warning      => v_warning
+    );
+
+    -- Преобразование CLOB в XMLTYPE
+    v_xml := XMLTYPE(v_clob);
+
+    -- Извлечение данных из тегов, начинающихся с "event"
+    FOR rec IN (
+        SELECT
+            x.event_name,
+            x.event_num,
+            x.event_sum
+        FROM XMLTABLE(
+            '/doc/fl/events/*[starts-with(name(), "event")]' PASSING v_xml
+            COLUMNS
+                event_name VARCHAR2(100) PATH 'name()',
+                event_num  NUMBER        PATH 'num',
+                event_sum  NUMBER        PATH 'sum'
+        ) x
+    ) LOOP
+        -- Вставка данных в целевую таблицу
+        INSERT INTO target_table (id, event_name, event_num, event_sum)
+        VALUES (target_table_seq.NEXTVAL, rec.event_name, rec.event_num, rec.event_sum);
+    END LOOP;
+
+    -- Коммит транзакции
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Ошибка: ' || SQLERRM);
+        ROLLBACK;
+END;
