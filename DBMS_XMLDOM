@@ -1,0 +1,33 @@
+DECLARE
+    v_xml       XMLTYPE := XMLTYPE('<root><event1>Data1</event1><event2>Data2</event2><not_event>Other</not_event></root>');
+    v_doc       DBMS_XMLDOM.DOMDocument;
+    v_node_list DBMS_XMLDOM.DOMNodeList;
+    v_node      DBMS_XMLDOM.DOMNode;
+    v_name      VARCHAR2(100);
+    v_value     VARCHAR2(100);
+    i           INTEGER;
+BEGIN
+    -- Преобразование XML в DOM-документ
+    v_doc := DBMS_XMLDOM.NEWDOMDOCUMENT(v_xml);
+
+    -- Получение списка узлов, начинающихся с "event"
+    v_node_list := DBMS_XMLDOM.SELECTNODES(v_doc, '/*/*[starts-with(local-name(), "event")]');
+
+    -- Цикл по узлам, начинающимся с "event"
+    FOR i IN 0..DBMS_XMLDOM.GETLENGTH(v_node_list)-1 LOOP
+        -- Извлечение текущего узла
+        v_node := DBMS_XMLDOM.ITEM(v_node_list, i);
+
+        -- Извлечение имени узла
+        v_name := DBMS_XMLDOM.GETNODENAME(v_node);
+
+        -- Извлечение значения узла
+        v_value := DBMS_XMLDOM.GETNODEVALUE(DBMS_XMLDOM.GETFIRSTCHILD(v_node));
+
+        -- Вывод результата
+        DBMS_OUTPUT.PUT_LINE('Node Name: ' || v_name || ', Value: ' || v_value);
+    END LOOP;
+
+    -- Освобождение ресурсов
+    DBMS_XMLDOM.FREEDOCUMENT(v_doc);
+END;
