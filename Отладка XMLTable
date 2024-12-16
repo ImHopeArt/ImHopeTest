@@ -1,0 +1,8 @@
+SELECT *
+FROM XMLTable(
+         '//*[starts-with(name(), "fl_event")]'
+         PASSING XMLTYPE('<root><fl_event1>Value1</fl_event1><fl_event2>Value2</fl_event2></root>')
+         COLUMNS
+             node_xml  VARCHAR2(4000) PATH '.', 
+             node_value VARCHAR2(4000) PATH 'text()'
+     ) x;
