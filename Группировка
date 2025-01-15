@@ -52,6 +52,14 @@ Copy code
 <?for-each-group:record;concat(./account, '-', ./symbol)?>
 Счёт: <?account?>, Символ касплана: <?symbol?>
 
+Альтернатива без concat
+Если в XML уже есть поле, содержащее комбинированное значение (например, account-symbol), вы можете использовать его напрямую:
+
+xml
+Copy code
+<?for-each-group:record;./account-symbol?>
+Но если такого поля нет, concat — это самый простой способ создать уникальный ключ "на лету".
+
 <w:tbl>
   <w:tr>
     <w:tc>Значение: <?value?></w:tc>
