@@ -1,0 +1,47 @@
+На основании предоставленного изображения, объект COR_COMPRESSOR_ARJ является пользовательским типом объекта (Object Type) в схеме TBG. Он содержит 4 атрибута и 8 методов. Вот более детальное объяснение структуры:
+
+Описание атрибутов:
+NAME — Вероятно, название компрессора или имя файла.
+ARCHIVE_NAME — Имя создаваемого архива.
+WORK_DIR — Рабочая директория, используемая для операций.
+UTILITY — Может быть ссылкой на вспомогательные утилиты или параметры.
+Описание методов:
+Объект имеет несколько методов:
+
+ADD_FILE — Вероятно, добавляет файл в список для последующего сжатия.
+COMPRESS_FILE — Основной метод для выполнения сжатия.
+FINALIZE — Закрывает процесс сжатия и завершает операции.
+INITIALIZE — Инициализирует параметры компрессора или создает объект.
+COR_COMPRESSOR_ARJ — Это может быть конструктор объекта.
+Характеристики типа объекта:
+Predefined: No — Это пользовательский тип, а не системный.
+Evolved: No — Тип не был изменен после своего создания.
+Final: Yes — Тип не может быть расширен.
+Super Type: COR_EXT_COMPRESSOR — Этот объект унаследован от базового типа COR_EXT_COMPRESSOR.
+Что можно сделать с этим типом:
+Использование в PL/SQL: Этот тип можно использовать для создания переменных или параметров в процедурах.
+
+sql
+Copy code
+DECLARE
+    compressor COR_COMPRESSOR_ARJ;
+BEGIN
+    compressor := COR_COMPRESSOR_ARJ('MyFile', 'MyArchive', '/workdir', 'utility');
+    compressor.INITIALIZE;
+    compressor.ADD_FILE('file1.txt');
+    compressor.COMPRESS_FILE;
+    compressor.FINALIZE;
+END;
+Создание таблицы на основе типа:
+
+sql
+Copy code
+CREATE TABLE compressor_table OF COR_COMPRESSOR_ARJ;
+Проверка содержимого:
+Посмотреть методы и спецификацию можно с помощью:
+
+sql
+Copy code
+SELECT * FROM all_object_types WHERE type_name = 'COR_COMPRESSOR_ARJ';
+SELECT text FROM all_source WHERE name = 'COR_COMPRESSOR_ARJ';
+Если хотите, могу помочь написать скрипт для работы с этим типом или объяснить любой метод более подробно!
