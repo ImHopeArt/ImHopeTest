@@ -45,3 +45,31 @@ Copy code
 SELECT * FROM all_object_types WHERE type_name = 'COR_COMPRESSOR_ARJ';
 SELECT text FROM all_source WHERE name = 'COR_COMPRESSOR_ARJ';
 Если хотите, могу помочь написать скрипт для работы с этим типом или объяснить любой метод более подробно!
+DECLARE
+    -- Объявляем переменную типа COR_COMPRESSOR_ARJ
+    compressor COR_COMPRESSOR_ARJ;
+BEGIN
+    -- Создаем экземпляр объекта и инициализируем его атрибуты
+    compressor := COR_COMPRESSOR_ARJ(
+        NAME         => 'Compressor1',
+        ARCHIVE_NAME => 'my_archive.arj',
+        WORK_DIR     => '/home/user/workdir',
+        UTILITY      => 'ARJ Utility'
+    );
+
+    -- Инициализируем процесс компрессии
+    compressor.INITIALIZE;
+
+    -- Добавляем файлы для сжатия
+    compressor.ADD_FILE('file1.txt');
+    compressor.ADD_FILE('file2.txt');
+
+    -- Выполняем сжатие файлов
+    compressor.COMPRESS_FILE;
+
+    -- Завершаем процесс и освобождаем ресурсы
+    compressor.FINALIZE;
+
+    -- Выводим сообщение о завершении
+    DBMS_OUTPUT.PUT_LINE('Compression completed successfully!');
+END;
